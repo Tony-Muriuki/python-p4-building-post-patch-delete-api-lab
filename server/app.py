@@ -21,64 +21,106 @@ def home():
 @app.route('/bakeries')
 def bakeries():
     bakeries = [bakery.to_dict() for bakery in Bakery.query.all()]
-    return make_response(bakeries, 200)
+    return make_response(  bakeries,   200  )
 
-@app.route('/bakeries/<int:id>')
+@app.route('/bakeries/<int:id>', methods=['GET', 'PATCH'])
 def bakery_by_id(id):
-    bakery = Bakery.query.filter_by(id=id).first()
-    if bakery:
+    if request.method == 'GET':
+        bakery = Bakery.query.filter_by(id=id).first()
+        if bakery is None:
+            return make_response({'error': 'Bakery not found'}, 404)
+        
         bakery_serialized = bakery.to_dict()
         return make_response(bakery_serialized, 200)
-    return make_response({'error': 'Bakery not found'}, 404)
+    
+    elif request.method == 'PATCH':
+        bakery = Bakery.query.filter_by(id=id).first()
+        if bakery is None:
+            return make_response({'error': 'Bakery not found'}, 404)
+        
+        # Update bakery attributes from form data
+        for attr, value in request.form.items():#request.form is a dictionary-like object that contains the form data submitted with the PATCH request.
+            setattr(bakery, attr, value)#setattr is a built-in Python function that sets an attribute of an object.
+        
+        db.session.commit()
+        
+        bakery_updated = bakery.to_dict()
+        return make_response(bakery_updated, 200)
+
+
+
+
+@app.route('/baked_goods', methods=['GET','POST'])
+def creates_baked_goods():
+    if request.method=='GET':
+        items_baked=[]
+        for items in BakedGood.query.all():
+            items_dict=items.to_dict()
+            items_baked.append(items_dict)
+        response=make_response(
+            items_baked,
+            200
+        )
+        return response
+    elif request.method=='POST':
+        new_baked_good=BakedGood(
+            name=request.form.get("name"),
+            price=request.form.get("price"),
+            bakery_id=request.form.get("bakery_id")
+        )
+        db.session.add(new_baked_good)
+        db.session.commit()
+        
+        baked_dict=new_baked_good.to_dict()
+        
+        response=make_response(
+            baked_dict,
+            201
+        )
+        return response
+    
+@app.route('/baked_goods/<int:id>', methods=['GET', 'DELETE'])
+def handle_baked_good(id):
+    if request.method == 'GET':
+        baked_good = BakedGood.query.filter_by(id=id).first()
+        if baked_good is None:
+            return make_response({'error': 'Baked good not found'}, 404)
+        
+        baked_good_dict = baked_good.to_dict()
+        return make_response(baked_good_dict, 200)
+
+    elif request.method == 'DELETE':
+        baked_good = BakedGood.query.filter_by(id=id).first()
+        if baked_good is None:
+            return make_response({'error': 'Baked good not found'}, 404)
+        
+        db.session.delete(baked_good)
+        db.session.commit()
+        
+        response_body = {
+            "delete_successful": True,
+            "message": "Baked good deleted successfully."
+        }
+        return make_response(response_body, 200)
+
+        
+    
 
 @app.route('/baked_goods/by_price')
 def baked_goods_by_price():
     baked_goods_by_price = BakedGood.query.order_by(BakedGood.price.desc()).all()
-    baked_goods_by_price_serialized = [bg.to_dict() for bg in baked_goods_by_price]
-    return make_response(baked_goods_by_price_serialized, 200)
+    baked_goods_by_price_serialized = [
+        bg.to_dict() for bg in baked_goods_by_price
+    ]
+    return make_response( baked_goods_by_price_serialized, 200  )
+
+   
 
 @app.route('/baked_goods/most_expensive')
 def most_expensive_baked_good():
     most_expensive = BakedGood.query.order_by(BakedGood.price.desc()).limit(1).first()
-    if most_expensive:
-        most_expensive_serialized = most_expensive.to_dict()
-        return make_response(most_expensive_serialized, 200)
-    return make_response({'error': 'No baked goods found'}, 404)
-
-@app.route('/baked_goods', methods=['POST'])
-def create_baked_good():
-    data = request.form
-    new_baked_good = BakedGood(
-        name=data.get('name'),
-        price=data.get('price'),
-        bakery_id=data.get('bakery_id')
-    )
-    db.session.add(new_baked_good)
-    db.session.commit()
-    return make_response(new_baked_good.to_dict(), 201)
-
-@app.route('/bakeries/<int:id>', methods=['PATCH'])
-def update_bakery(id):
-    bakery = Bakery.query.filter_by(id=id).first()
-    if not bakery:
-        return make_response({'error': 'Bakery not found'}, 404)
-    
-    data = request.form
-    if 'name' in data:
-        bakery.name = data.get('name')
-    
-    db.session.commit()
-    return make_response(bakery.to_dict(), 200)
-
-@app.route('/baked_goods/<int:id>', methods=['DELETE'])
-def delete_baked_good(id):
-    baked_good = BakedGood.query.filter_by(id=id).first()
-    if not baked_good:
-        return make_response({'error': 'Baked good not found'}, 404)
-    
-    db.session.delete(baked_good)
-    db.session.commit()
-    return make_response({'message': 'Baked good deleted successfully'}, 200)
+    most_expensive_serialized = most_expensive.to_dict()
+    return make_response( most_expensive_serialized,   200  )
 
 if __name__ == '__main__':
     app.run(port=5555, debug=True)
